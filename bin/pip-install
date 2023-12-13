@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -eo pipefail
+set -x
+
+python3 -m pip install --upgrade pip
+
+pip install --no-cache-dir -r /usr/src/app/requirements.txt
+
+if [[ "$1" != "nvidia/cuda"* ]]; then
+    exit 0
+fi
+
+pip install --ignore-installed torch torchvision torchaudio -f https://download.pytorch.org/whl/cu121/torch_stable.html

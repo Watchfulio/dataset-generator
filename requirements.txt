@@ -1,0 +1,11 @@
+streamlit
+openai
+matplotlib
+numpy
+streamlit-extras
+streamlit-plotly-events
+watchdog
+torch
+vec2text
+plotly
+umap-learn

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+if [[ "$1" != "nvidia/cuda"* ]]; then
+    exit 0
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get update &&
+    apt-get install -y \
+        git \
+        python3-pip \
+        python3-dev \
+        python3-opencv \
+        libglib2.0-0

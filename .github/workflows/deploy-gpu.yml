@@ -1,0 +1,29 @@
+---
+name: 'deploy to gpu'
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - main
+
+env:
+  APP_NAME: dataset-generator
+  SERVER_NAME: deploy.gpu-demos.watchful.io
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cloning repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to dokku
+        uses: dokku/github-action@master
+        with:
+          git_push_flags: '--force'
+          git_remote_url: 'ssh://dokku@${{ env.SERVER_NAME }}:22/${{ env.APP_NAME }}'
+          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          branch: main
