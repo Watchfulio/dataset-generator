@@ -1,3 +1,4 @@
+import logging
 import math
 import os
 
@@ -10,6 +11,15 @@ import umap
 import vec2text
 from scipy import pi as PI
 from scipy.stats import invgauss, norm, randint, uniform
+
+# Configure root logger to capture only WARN or higher level logs
+logging.basicConfig(
+    level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+# Configure logger to capture DEBUG-level logs
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 st.set_page_config(layout="wide", page_title="Dataset Generator", page_icon="🖨️")
 st.title('🖨️ Dataset Generator')
@@ -528,100 +538,106 @@ if submitted and os.environ.get('OPENAI_API_KEY') is not None:
     progress.progress(5, "Loading corrector...")
     corrector = load_corrector()
 
-    with chart_placeholder.container():
-        # Get the embeddings for the input text from OpenAI
-        progress.progress(10, "Fetching embeddings...")
-        embeddings = get_embeddings_openai(example_text)
+    try:
+        with chart_placeholder.container():
+            # Get the embeddings for the input text from OpenAI
+            progress.progress(10, "Fetching embeddings...")
+            embeddings = get_embeddings_openai(example_text)
 
-        progress.progress(20, "Mapping embedding space...")
-        sample_shape = st.session_state.sample_shape if st.session_state.sample_shape else "cone"
-        percentile = st.session_state.percentile_covered if st.session_state.percentile_covered else 99
-        distribution = st.session_state.distribution if st.session_state.distribution else "uniform"
+            progress.progress(20, "Mapping embedding space...")
+            sample_shape = st.session_state.sample_shape if st.session_state.sample_shape else "cone"
+            percentile = st.session_state.percentile_covered if st.session_state.percentile_covered else 99
+            distribution = st.session_state.distribution if st.session_state.distribution else "uniform"
 
-        progress.progress(25, "Calculating centroid and text...")
-        centroid, centroid_text = get_centroid_and_text(embeddings, iterations, corrector)
+            progress.progress(25, "Calculating centroid and text...")
+            centroid, centroid_text = get_centroid_and_text(embeddings, iterations, corrector)
 
-        progress.progress(40, "Sampling embeddings...")
-        if sample_shape == "sphere":
-            st.session_state.calculate_cone_dims = False
-            sampled_embeddings, space_embeddings = get_sphere_samples(centroid, example_count, distribution)
-            new_embeddings = sampled_embeddings.cuda()
-        elif sample_shape == "cone":
-            sampled_embeddings, space_embeddings = get_cone_samples(embeddings, centroid, example_count, percentile, distribution)
-            new_embeddings = torch.from_numpy(sampled_embeddings).float().cuda()
+            progress.progress(40, "Sampling embeddings...")
+            if sample_shape == "sphere":
+                st.session_state.calculate_cone_dims = False
+                sampled_embeddings, space_embeddings = get_sphere_samples(centroid, example_count, distribution)
+                new_embeddings = sampled_embeddings.cuda()
+            elif sample_shape == "cone":
+                sampled_embeddings, space_embeddings = get_cone_samples(embeddings, centroid, example_count, percentile, distribution)
+                new_embeddings = torch.from_numpy(sampled_embeddings).float().cuda()
 
-        progress.progress(50, "Reducing dimensions...")
-        # Combine all embeddings
-        all_embeddings = np.vstack([centroid, sampled_embeddings, embeddings.cpu().numpy(), space_embeddings])
+            progress.progress(50, "Reducing dimensions...")
+            # Combine all embeddings
+            all_embeddings = np.vstack([centroid, sampled_embeddings, embeddings.cpu().numpy(), space_embeddings])
 
-        # Perform umap to reduce dimensions to 3
-        reducer = umap.UMAP(n_neighbors=30, n_components=3, metric='euclidean')
-        all_embeddings_reduced = reducer.fit_transform(all_embeddings)
+            # Perform umap to reduce dimensions to 3
+            reducer = umap.UMAP(n_neighbors=30, n_components=3, metric='euclidean')
+            all_embeddings_reduced = reducer.fit_transform(all_embeddings)
 
-        progress.progress(75, "Inverting embeddings... This may take a while")
-        generated_text = vec2text.invert_embeddings(embeddings=new_embeddings,
-                                                        corrector=corrector,
-                                                        num_steps=iterations)
+            progress.progress(75, "Inverting embeddings... This may take a while")
+            generated_text = vec2text.invert_embeddings(embeddings=new_embeddings,
+                                                            corrector=corrector,
+                                                            num_steps=iterations)
 
-        progress.progress(90, "Plotting...")
-        # Extract the reduced embeddings
-        centroid_reduced = all_embeddings_reduced[0:1, :]
-        sampled_embeddings_reduced = all_embeddings_reduced[1:1+len(sampled_embeddings), :]
-        provided_embeddings_reduced = all_embeddings_reduced[1+len(sampled_embeddings):1+len(sampled_embeddings)+len(embeddings.cpu().numpy()), :]
-        space_embeddings_reduced = all_embeddings_reduced[1+len(sampled_embeddings)+len(embeddings.cpu().numpy()):, :]
+            progress.progress(90, "Plotting...")
+            # Extract the reduced embeddings
+            centroid_reduced = all_embeddings_reduced[0:1, :]
+            sampled_embeddings_reduced = all_embeddings_reduced[1:1+len(sampled_embeddings), :]
+            provided_embeddings_reduced = all_embeddings_reduced[1+len(sampled_embeddings):1+len(sampled_embeddings)+len(embeddings.cpu().numpy()), :]
+            space_embeddings_reduced = all_embeddings_reduced[1+len(sampled_embeddings)+len(embeddings.cpu().numpy()):, :]
 
-        fig = plot_full_distribution(
-            space_embeddings_reduced,
-            centroid_reduced,
-            sampled_embeddings_reduced,
-            provided_embeddings_reduced,
-            centroid_text=centroid_text,
-            sampled_text=generated_text,
-            provided_text=example_text
-        )
-
-        # Regular streamlit chart
-        st.plotly_chart(
-            fig, theme="streamlit", use_container_width=True,
-            key="scatter_chart"
-        )
-
-        # If we first calculated the cone dimensions, then we need to display them
-        # so the user can see what the calculated values are and adjust them if needed.
-        if st.session_state.calculate_cone_dims is True:
-            angle.number_input(
-                'Cone angle in degrees',
-                min_value=1.0, max_value=90.0, step=2.0,
-                key="cone_angle_degrees",
-                help="What should the cone angle be? A larger angle implies a flattened, fatter cone."
+            fig = plot_full_distribution(
+                space_embeddings_reduced,
+                centroid_reduced,
+                sampled_embeddings_reduced,
+                provided_embeddings_reduced,
+                centroid_text=centroid_text,
+                sampled_text=generated_text,
+                provided_text=example_text
             )
 
-            height.number_input(
-                'Cone height',
-                min_value=0.01, max_value=1.0, step=0.01,
-                key="cone_height",
-                help="What should the cone height be? A larger height implies a taller, thinner cone."
+            # Regular streamlit chart
+            st.plotly_chart(
+                fig, theme="streamlit", use_container_width=True,
+                key="scatter_chart"
             )
 
+            # If we first calculated the cone dimensions, then we need to display them
+            # so the user can see what the calculated values are and adjust them if needed.
+            if st.session_state.calculate_cone_dims is True:
+                angle.number_input(
+                    'Cone angle in degrees',
+                    min_value=1.0, max_value=90.0, step=2.0,
+                    key="cone_angle_degrees",
+                    help="What should the cone angle be? A larger angle implies a flattened, fatter cone."
+                )
 
-        if st.session_state.sample_shape == "cone":
-            c1, c2 = st.columns(2, gap="large")
-            with c1:
-                st.write(f"**Cone Angle:** {round(st.session_state.cone_angle_degrees, 4)} degrees")
+                height.number_input(
+                    'Cone height',
+                    min_value=0.01, max_value=1.0, step=0.01,
+                    key="cone_height",
+                    help="What should the cone height be? A larger height implies a taller, thinner cone."
+                )
 
-            with c2:
-                st.write(f"**Cone Height:** {round(st.session_state.cone_height, 4)}")
 
-            st.session_state.calculate_cone_dims = False
+            if st.session_state.sample_shape == "cone":
+                c1, c2 = st.columns(2, gap="large")
+                with c1:
+                    st.write(f"**Cone Angle:** {round(st.session_state.cone_angle_degrees, 4)} degrees")
 
-        st.write("**Centroid text:**")
-        st.write(centroid_text[0])
+                with c2:
+                    st.write(f"**Cone Height:** {round(st.session_state.cone_height, 4)}")
 
+                st.session_state.calculate_cone_dims = False
+
+            st.write("**Centroid text:**")
+            st.write(centroid_text[0])
+
+            progress.empty()
+
+
+        with text_placeholder.container(border=False):
+            st.subheader('Generated text')
+
+            for text in generated_text:
+                st.write(text)
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
         progress.empty()
-
-
-    with text_placeholder.container(border=False):
-        st.subheader('Generated text')
-
-        for text in generated_text:
-            st.write(text)
+        logger.debug(f"EXAMPLE_TEXT: {example_text}")
+        logger.exception(e)
