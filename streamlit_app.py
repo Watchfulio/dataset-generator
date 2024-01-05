@@ -521,7 +521,7 @@ with col1:
         example_text = st.text_area(
             'Reference text to be used to generate more. One example per line. Plain text only.',
             height=440, max_chars=7000, key="example_text",
-        ).splitlines()
+        )
 
         submitted = st.form_submit_button('Submit', type="primary")
 
@@ -542,7 +542,7 @@ if submitted and os.environ.get('OPENAI_API_KEY') is not None:
         with chart_placeholder.container():
             # Get the embeddings for the input text from OpenAI
             progress.progress(10, "Fetching embeddings...")
-            embeddings = get_embeddings_openai(example_text)
+            embeddings = get_embeddings_openai(example_text.splitlines())
 
             progress.progress(20, "Mapping embedding space...")
             sample_shape = st.session_state.sample_shape if st.session_state.sample_shape else "cone"
@@ -588,7 +588,7 @@ if submitted and os.environ.get('OPENAI_API_KEY') is not None:
                 provided_embeddings_reduced,
                 centroid_text=centroid_text,
                 sampled_text=generated_text,
-                provided_text=example_text
+                provided_text=example_text.splitlines()
             )
 
             # Regular streamlit chart
@@ -639,5 +639,5 @@ if submitted and os.environ.get('OPENAI_API_KEY') is not None:
     except Exception as e:
         st.error(f"An error occurred: {e}")
         progress.empty()
-        logger.debug(f"EXAMPLE_TEXT: {example_text}")
+        logger.debug(f"EXAMPLE_TEXT: {example_text.splitlines()}")
         logger.exception(e)
