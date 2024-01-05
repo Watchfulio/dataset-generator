@@ -534,6 +534,10 @@ progress = st.empty()
 
 text_placeholder = st.empty()
 
+if submitted and not example_text:
+    st.error("Please enter some reference text to be used to generate more.")
+    st.stop()
+
 if submitted and os.environ.get('OPENAI_API_KEY') is not None:
     progress.progress(5, "Loading corrector...")
     corrector = load_corrector()
