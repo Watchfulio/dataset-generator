@@ -546,7 +546,7 @@ if submitted and os.environ.get('OPENAI_API_KEY') is not None:
         with chart_placeholder.container():
             # Get the embeddings for the input text from OpenAI
             progress.progress(10, "Fetching embeddings...")
-            embeddings = get_embeddings_openai(example_text.splitlines())
+            embeddings = get_embeddings_openai(filter(example_text.splitlines()))
 
             progress.progress(20, "Mapping embedding space...")
             sample_shape = st.session_state.sample_shape if st.session_state.sample_shape else "cone"
@@ -592,7 +592,7 @@ if submitted and os.environ.get('OPENAI_API_KEY') is not None:
                 provided_embeddings_reduced,
                 centroid_text=centroid_text,
                 sampled_text=generated_text,
-                provided_text=example_text.splitlines()
+                provided_text=filter(example_text.splitlines())
             )
 
             # Regular streamlit chart
@@ -643,5 +643,5 @@ if submitted and os.environ.get('OPENAI_API_KEY') is not None:
     except Exception as e:
         st.error(f"An error occurred: {e}")
         progress.empty()
-        logger.debug(f"EXAMPLE_TEXT: {example_text.splitlines()}")
+        logger.debug(f"EXAMPLE_TEXT: {example_text}")
         logger.exception(e)
