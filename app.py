@@ -2,15 +2,18 @@ import logging
 import math
 import os
 
+from dotenv import load_dotenv
 import numpy as np
 import openai
 import plotly.graph_objects as go
+from scipy.constants import pi as PI
+from scipy.stats import invgauss, norm, randint, uniform
 import streamlit as st
 import torch
 import umap
 import vec2text
-from scipy import pi as PI
-from scipy.stats import invgauss, norm, randint, uniform
+
+load_dotenv()
 
 # Configure root logger to capture only WARN or higher level logs
 logging.basicConfig(
@@ -45,7 +48,8 @@ def get_embeddings_openai(text_list: list[str]) -> torch.Tensor:
     Returns:
       torch.Tensor: A tensor of embeddings
     """
-    client = openai.OpenAI()
+    api_key = os.getenv("OPENAI_API_KEY", "Not Found")
+    client = openai.OpenAI(api_key=api_key)
     response = client.embeddings.create(
             input=text_list,
             model=MODEL,
@@ -57,7 +61,7 @@ def get_embeddings_openai(text_list: list[str]) -> torch.Tensor:
 
 @st.cache_resource(show_spinner=False)
 def load_corrector() -> vec2text.Corrector:
-    corrector = vec2text.load_corrector(MODEL)
+    corrector = vec2text.load_pretrained_corrector(MODEL)
 
     return corrector
 
@@ -141,7 +145,7 @@ def sample_hypersphere(centroid: torch.Tensor, radius: float, m: int, n: int, di
         torch.Tensor: m points within the n-dimensional hypersphere.
     """
     assert distribution in ["uniform", "normal", "inverse_normal"]
-    device = torch.device("cuda" if use_gpu and torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if use_gpu and torch.cuda.is_available() else "mps")
     centroid = centroid.to(device)
     # Generate m points from a Gaussian distribution
     points = torch.randn(m, n, device=device)
@@ -266,7 +270,12 @@ def get_centroid_and_text(
         tuple[torch.Tensor, list[str]]: The centroid and text for the centroid.
     """
     centroid = calculate_centroid(embeddings)
-    centroid_text = vec2text.invert_embeddings(embeddings=centroid.unsqueeze(0).cuda(),
+    if torch.cuda.is_available():
+        centroid_text = vec2text.invert_embeddings(embeddings=centroid.unsqueeze(0).cuda(),
+                                                    corrector=corrector,
+                                                    num_steps=iterations)
+    else:
+        centroid_text = vec2text.invert_embeddings(embeddings=centroid.unsqueeze(0).to(torch.device("mps")),
                                                 corrector=corrector,
                                                 num_steps=iterations)
 
@@ -314,8 +323,13 @@ def get_cone_samples(
         tuple[np.ndarray, np.ndarray]: The sampled embeddings and the space embeddings.
     """
     if st.session_state.calculate_cone_dims is True:
-        cone_height = calculate_cone_height(embeddings.cuda(), centroid.cuda(), percentile).cpu().item()
-        cone_angle_radians = calculate_cone_angle(embeddings.cuda(), centroid.cuda(), torch.Tensor([cone_height]).cuda(), percentile).cpu().item()
+        if torch.cuda.is_available():
+            cone_angle_radians = calculate_cone_angle(embeddings.cuda(), centroid.cuda(), torch.Tensor([cone_height]).cuda(), percentile).cpu().item()
+            cone_height = calculate_cone_height(embeddings.cuda(), centroid.cuda(), percentile).cpu().item()
+        else:
+            cone_height = calculate_cone_height(embeddings.to(torch.device("mps")), centroid.to(torch.device("mps")), percentile).to(torch.device("mps")).item()
+            cone_angle_radians = calculate_cone_angle(embeddings.to(torch.device("mps")), centroid.to(torch.device("mps")), torch.Tensor([cone_height]).to(torch.device("mps")), percentile).to(torch.device("mps")).item()
+
         st.session_state.cone_angle_degrees = math.degrees(cone_angle_radians)
         st.session_state.cone_height = cone_height
     else:
@@ -560,10 +574,16 @@ if submitted and os.environ.get('OPENAI_API_KEY') is not None:
             if sample_shape == "sphere":
                 st.session_state.calculate_cone_dims = False
                 sampled_embeddings, space_embeddings = get_sphere_samples(centroid, example_count, distribution)
-                new_embeddings = sampled_embeddings.cuda()
+                if torch.cuda.is_available():
+                    new_embeddings = sampled_embeddings.cuda()
+                else:
+                    new_embeddings = sampled_embeddings.to(torch.device("mps"))
             elif sample_shape == "cone":
                 sampled_embeddings, space_embeddings = get_cone_samples(embeddings, centroid, example_count, percentile, distribution)
-                new_embeddings = torch.from_numpy(sampled_embeddings).float().cuda()
+                if torch.cuda.is_available():
+                    new_embeddings = torch.from_numpy(sampled_embeddings).float().cuda()
+                else:
+                    new_embeddings = torch.from_numpy(sampled_embeddings).float().to(torch.device("mps"))
 
             progress.progress(50, "Reducing dimensions...")
             # Combine all embeddings

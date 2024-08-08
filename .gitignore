@@ -1,4 +1,5 @@
 .venv
+.env
 .mypy_cache
 tmp_trainer/
 .DS_Store
