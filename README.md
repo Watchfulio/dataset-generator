@@ -10,5 +10,5 @@ This demo requires PyTorch to be compiled with CUDA support.
 
 ```bash
 pip install -r requirements.txt
-OPENAI_KEY=<KEY> streamlit run app.py
+OPENAI_API_KEY=<KEY> streamlit run app.py
 ```
