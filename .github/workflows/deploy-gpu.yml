@@ -25,5 +25,5 @@ jobs:
         with:
           git_push_flags: '--force'
           git_remote_url: 'ssh://dokku@${{ env.SERVER_NAME }}:22/${{ env.APP_NAME }}'
-          ssh_private_key: ${{ secrets.TW_DEMO_SECRET_KEY }}
+          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
           branch: main
