@@ -7,6 +7,7 @@ streamlit
 streamlit-extras
 streamlit-plotly-events
 torch
+transformers
 umap-learn
 vec2text
 watchdog
