@@ -145,7 +145,7 @@ def sample_hypersphere(centroid: torch.Tensor, radius: float, m: int, n: int, di
         torch.Tensor: m points within the n-dimensional hypersphere.
     """
     assert distribution in ["uniform", "normal", "inverse_normal"]
-    device = torch.device("cuda" if use_gpu and torch.cuda.is_available() else "mps")
+    device = torch.device("cuda" if use_gpu and torch.cuda.is_available() else "cpu")
     centroid = centroid.to(device)
     # Generate m points from a Gaussian distribution
     points = torch.randn(m, n, device=device)
@@ -275,7 +275,7 @@ def get_centroid_and_text(
                                                     corrector=corrector,
                                                     num_steps=iterations)
     else:
-        centroid_text = vec2text.invert_embeddings(embeddings=centroid.unsqueeze(0).to(torch.device("mps")),
+        centroid_text = vec2text.invert_embeddings(embeddings=centroid.unsqueeze(0).to(torch.device("cpu")),
                                                 corrector=corrector,
                                                 num_steps=iterations)
 
@@ -327,8 +327,8 @@ def get_cone_samples(
             cone_angle_radians = calculate_cone_angle(embeddings.cuda(), centroid.cuda(), torch.Tensor([cone_height]).cuda(), percentile).cpu().item()
             cone_height = calculate_cone_height(embeddings.cuda(), centroid.cuda(), percentile).cpu().item()
         else:
-            cone_height = calculate_cone_height(embeddings.to(torch.device("mps")), centroid.to(torch.device("mps")), percentile).to(torch.device("mps")).item()
-            cone_angle_radians = calculate_cone_angle(embeddings.to(torch.device("mps")), centroid.to(torch.device("mps")), torch.Tensor([cone_height]).to(torch.device("mps")), percentile).to(torch.device("mps")).item()
+            cone_height = calculate_cone_height(embeddings.to(torch.device("cpu")), centroid.to(torch.device("cpu")), percentile).to(torch.device("cpu")).item()
+            cone_angle_radians = calculate_cone_angle(embeddings.to(torch.device("cpu")), centroid.to(torch.device("cpu")), torch.Tensor([cone_height]).to(torch.device("cpu")), percentile).to(torch.device("cpu")).item()
 
         st.session_state.cone_angle_degrees = math.degrees(cone_angle_radians)
         st.session_state.cone_height = cone_height
@@ -577,13 +577,13 @@ if submitted and os.environ.get('OPENAI_API_KEY') is not None:
                 if torch.cuda.is_available():
                     new_embeddings = sampled_embeddings.cuda()
                 else:
-                    new_embeddings = sampled_embeddings.to(torch.device("mps"))
+                    new_embeddings = sampled_embeddings.to(torch.device("cpu"))
             elif sample_shape == "cone":
                 sampled_embeddings, space_embeddings = get_cone_samples(embeddings, centroid, example_count, percentile, distribution)
                 if torch.cuda.is_available():
                     new_embeddings = torch.from_numpy(sampled_embeddings).float().cuda()
                 else:
-                    new_embeddings = torch.from_numpy(sampled_embeddings).float().to(torch.device("mps"))
+                    new_embeddings = torch.from_numpy(sampled_embeddings).float().to(torch.device("cpu"))
 
             progress.progress(50, "Reducing dimensions...")
             # Combine all embeddings
