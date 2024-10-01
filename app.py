@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 import numpy as np
 import openai
+from PIL import Image
 import plotly.graph_objects as go
 from scipy.constants import pi as PI
 from scipy.stats import invgauss, norm, randint, uniform
@@ -24,7 +25,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-st.set_page_config(layout="wide", page_title="Dataset Generator", page_icon="🖨️")
+favicon = Image.open("images/favicon.ico")
+
+# Set page layout
+st.set_page_config(layout="wide", page_title="Dataset Generator", page_icon=favicon)
+st.logo("images/thoughworks_logo.png")
+
 st.title('🖨️ Dataset Generator')
 st.markdown("""
             This demo is a practical example of the geometric approach to latent space sampling as described in the paper [Navigating the Geometry of Language: A New Approach to Synthetic Text Generation](https://www.watchful.io/blog/navigating-the-geometry-of-language-a-new-approach-to-synthetic-text-generation). It allows you to generate new synthetic data given some reference text using OpenAI’s ada-002 embedding model. You can browse the source on [GitHub](https://github.com/Watchfulio/dataset-generator).
