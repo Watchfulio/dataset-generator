@@ -29,7 +29,7 @@ favicon = Image.open("images/favicon.ico")
 
 # Set page layout
 st.set_page_config(layout="wide", page_title="Dataset Generator", page_icon=favicon)
-st.logo("images/thoughworks_logo.png")
+st.logo("images/thoughworks-logo.svg")
 
 st.title('🖨️ Dataset Generator')
 st.markdown("""
